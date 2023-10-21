@@ -1,0 +1,17 @@
+{
+  "name": "chieftain-rss",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler publish --config=./wrangler.toml",
+    "start": "wrangler dev",
+    "lint": "npx standard --fix"
+  },
+  "devDependencies": {
+    "wrangler": "^2.0.0"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.3.2"
+  }
+}
