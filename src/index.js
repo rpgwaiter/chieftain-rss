@@ -1,7 +1,18 @@
 // Unofficial RSS feed generator for The Pueblo Chieftain
 import { XMLBuilder } from 'fast-xml-parser'
 
-async function generateRSS () {
+async function extractArticleInfo(url, KV) {
+  const raw = await fetch(url).then(r => r.text())
+  const article = {
+    link: url,
+    title: raw.match(/\<title\>(.+)\<\/title\>/)[1],
+    id: url.match(/\/\d+\/\d+\/\d+\/[^\/]*\/(\d+)\/*/)?.pop()
+  }
+  // await KV.put()
+  return article
+}
+
+async function generateRSS (env) {
   const now = new Date()
   const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Denver' })
   const localNow = new Date(formatter.format(now))
@@ -14,7 +25,7 @@ async function generateRSS () {
   console.log('Fetching:', url.toString(), '\n\n')
   const todaysLinks = await fetch(url)
     .then(r => r.text())
-    .then(r => r.match(/\/story\/news\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9\-]+\/\d+\//g))
+    .then(r => r.match(/\/story\/news\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9\-]+\/\d+\//g)) || []
 
   const rss_obj = {
     rss: {
@@ -27,9 +38,13 @@ async function generateRSS () {
         // lastBuildDate:
         // pubDate:
         language: 'en',
-        item: todaysLinks.map(i => {
-          const [, title, id] = i.match(/\/story\/news\/\d{4}\/\d{2}\/\d{2}\/([a-z0-9\-]+)\/(\d+)\//)
+        item: todaysLinks?.map(i => {
+          const [, titleRaw, id] = i.match(/\/story\/news\/\d{4}\/\d{2}\/\d{2}\/([a-z0-9\-]+)\/(\d+)\//)
           const link = (new URL(`https://www.chieftain.com${i}`)).toString()
+
+
+          
+
           return {
             title,
             description: 'TODO: Scrape the page',
@@ -49,7 +64,7 @@ async function generateRSS () {
 
 export default {
   async fetch (request, env, ctx) {
-    const xml = await generateRSS()
+    const xml = await generateRSS(env)
 
     return new Response(xml, {
       headers: {
