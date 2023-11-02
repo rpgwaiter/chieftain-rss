@@ -1,56 +1,18 @@
 name = "chieftain-rss"
-main = "src/index.js"
+main = "src/index.ts"
 compatibility_date = "2023-10-16"
 
 routes = [
 	{ pattern = "chieftain-rss.based.zone", custom_domain = true }
 ]
 
-
-# Variable bindings. These are arbitrary, plaintext strings (similar to environment variables)
-# Note: Use secrets to store sensitive data.
-# Docs: https://developers.cloudflare.com/workers/platform/environment-variables
-# [vars]
-# MY_VARIABLE = "production_value"
-
-# Bind a KV Namespace. Use KV as persistent storage for small key-value pairs.
-# Docs: https://developers.cloudflare.com/workers/runtime-apis/kv
 [[kv_namespaces]]
 binding = "CHIEFTAIN_KV"
 id = "53f0abfccb484a6fbb4469cb858f832c"
+preview_id = "aec9d1031d854a1ea6d5269044b28c30"
 
-# Bind an R2 Bucket. Use R2 to store arbitrarily large blobs of data, such as files.
-# Docs: https://developers.cloudflare.com/r2/api/workers/workers-api-usage/
 [[r2_buckets]]
 binding = "CHIEFTAIN_BUCKET"
 bucket_name = "chieftain-articles"
+preview_bucket_name = "chieftain-articles-staging"
 
-# Bind a Queue producer. Use this binding to schedule an arbitrary task that may be processed later by a Queue consumer.
-# Docs: https://developers.cloudflare.com/queues/get-started
-# [[queues.producers]]
-# binding = "MY_QUEUE"
-# queue = "my-queue"
-
-# Bind a Queue consumer. Queue Consumers can retrieve tasks scheduled by Producers to act on them.
-# Docs: https://developers.cloudflare.com/queues/get-started
-# [[queues.consumers]]
-# queue = "my-queue"
-
-# Bind another Worker service. Use this binding to call another Worker without network overhead.
-# Docs: https://developers.cloudflare.com/workers/platform/services
-# [[services]]
-# binding = "MY_SERVICE"
-# service = "my-service"
-
-# Bind a Durable Object. Durable objects are a scale-to-zero compute primitive based on the actor model.
-# Durable Objects can live for as long as needed. Use these when you need a long-running "server", such as in realtime apps.
-# Docs: https://developers.cloudflare.com/workers/runtime-apis/durable-objects
-# [[durable_objects.bindings]]
-# name = "MY_DURABLE_OBJECT"
-# class_name = "MyDurableObject"
-
-# Durable Object migrations.
-# Docs: https://developers.cloudflare.com/workers/learning/using-durable-objects#configure-durable-object-classes-with-migrations
-# [[migrations]]
-# tag = "v1"
-# new_classes = ["MyDurableObject"]
