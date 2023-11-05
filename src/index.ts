@@ -3,51 +3,64 @@ import { XMLBuilder } from 'fast-xml-parser'
 import type { KVNamespace, R2Bucket } from '@cloudflare/workers-types'
 
 const extractArticleInfo = (raw) => ({
-  title: raw.match(/\<title\>(.+)\<\/title\>/)[1],
-  description: 'TODO: Scrape the page',
+  title: raw.match(/<title>(.+)<\/title>/)[1],
+  description: 'TODO: Scrape the page'
 })
 
 async function processLinks (linkArray, env) {
   const CHIEFTAIN_BUCKET: R2Bucket = env.CHIEFTAIN_BUCKET
   const CHIEFTAIN_KV: KVNamespace = env.CHIEFTAIN_KV
 
-  return Promise.all(
+  return await Promise.all(
     linkArray?.map(async i => {
-      console.log('PROCESSING LINK:', i)
-
-      const [, titleRaw, id] = i.match(/\/story\/[A-Za-z0-9\-\_\/]*\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9\-]+\/([a-z0-9\-]+)\//)
+      const [, id] = i.match(/\/story\/[A-Za-z0-9-_\/]*\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+\/([a-z0-9-]+)\//)
       const link = (new URL(`https://www.chieftain.com${i}`)).toString()
 
-      let raw = await CHIEFTAIN_BUCKET.get(id).then(r => r?.text())
-      let article = {
-        link,
-        guid: link
-      }
+      // Try to get existing article from R2
+      let thisArticleR2 = await CHIEFTAIN_BUCKET.get(id).then(async r => await r?.text())
 
       // Check if we already have this article in KV
-      const existingArticleKV = await CHIEFTAIN_KV.get(`article:${id}`)
+      let thisArticleKV = await CHIEFTAIN_KV.get(`article:${id}`, 'json')
 
-      // If we don't have the article saved in our bucket, let's do that
-      if (!raw) {
-        console.log('No r2 object, putting one now')
-        raw = await fetch(link).then(r => r.text())
+      // Save R2 (raw article) if we're missing that
+      if (!thisArticleR2) {
+        console.log(`No saved metadata for ${id}, putting one now`)
+        thisArticleR2 = await fetch(link).then(async r => await r.text())
 
-        raw && await CHIEFTAIN_BUCKET.put(id, raw)
-      }
-
-      // if we don't have metadata, lets generate that
-      if (!existingArticleKV) {
-        console.log('No metadata, putting the article in kv')
-        article = {
-          ...article,
-          ...extractArticleInfo(raw)
+        // If we have an article at this point (we should unless something went very wrong)
+        // Then put it into our bucket
+        if (thisArticleR2) {
+          await CHIEFTAIN_BUCKET.put(id, thisArticleR2)
+        } else {
+          // We still couldn't get an article read, so we return null out of this map
+          console.error("we couldn't get an article, maybe we're rate limited or something..\n")
+          return null
         }
-        await env.CHIEFTAIN_KV.put(`article:${id}`, JSON.stringify(article))
       }
 
-      // TODO: check time and refresh, maybe keeping track of changes
+      // Save KV (metadata) if we're missing that
+      if (!thisArticleKV) {
+        console.log(`No metadata for ${id}, putting the article in kv`)
+        const extracted = extractArticleInfo(thisArticleR2)
 
-      return article
+        // console.log(`extracted ${id}:`, extracted)
+
+        thisArticleKV = {
+          ...extracted,
+          id,
+          link,
+          guid: link
+        }
+        await env.CHIEFTAIN_KV.put(`article:${id}`, JSON.stringify(thisArticleKV))
+      }
+
+      // One last sanity check to make sure we have everything
+      // Before we return the article metadata
+      if (thisArticleKV && thisArticleR2) {
+        return thisArticleKV
+      }
+      console.log('final failsafe triggered for some reason:', id)
+      return null
     })
   )
 }
@@ -62,10 +75,11 @@ async function generateRSS ({ env }) {
 
   const url = new URL(`https://www.chieftain.com/sitemap/${thisYear}/${thisMonth}/${thisDay}`)
 
-  console.log('Fetching:', url.toString(), '\n\n')
+  console.log('\n', `=== Fetching Today's Articles: ${url.toString()} ===`, '\n\n')
+
   const todaysLinks: String[] | [] = await fetch(url)
-    .then(r => r.text())
-    .then(r => r.match(/\/story\/[A-Za-z0-9\-\_\/]*\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9\-]+\/\d+\//g)) || []
+    .then(async r => await r.text())
+    .then(r => r.match(/\/story\/[A-Za-z0-9-_\/]*\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+\/\d+\//g)) || []
 
   const rss_obj = {
     rss: {

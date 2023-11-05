@@ -6,7 +6,7 @@
   "scripts": {
     "deploy": "wrangler publish --config=./wrangler.toml",
     "start": "wrangler dev",
-    "lint": "npx standard --fix"
+    "lint": "npx ts-standard --fix"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20231025.0",
