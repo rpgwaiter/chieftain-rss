@@ -11,16 +11,24 @@ async function processLinks (linkArray, env) {
   const CHIEFTAIN_BUCKET: R2Bucket = env.CHIEFTAIN_BUCKET
   const CHIEFTAIN_KV: KVNamespace = env.CHIEFTAIN_KV
 
+  if (!CHIEFTAIN_BUCKET) {
+    throw new Error('!!R2 BUCKET BINDINGS HAVE BROKEN!!')
+  }
+
+  if (!CHIEFTAIN_KV) {
+    throw new Error('!!KV BINDINGS HAVE BROKEN!!')
+  }
+
   return await Promise.all(
     linkArray?.map(async i => {
       const [, id] = i.match(/\/story\/[A-Za-z0-9-_\/]*\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+\/([a-z0-9-]+)\//)
       const link = (new URL(`https://www.chieftain.com${i}`)).toString()
 
       // Try to get existing article from R2
-      let thisArticleR2 = await CHIEFTAIN_BUCKET.get(id).then(async r => await r?.text())
+      let thisArticleR2 = await CHIEFTAIN_BUCKET.get(id).then(async r => await r?.text()) ?? null
 
       // Check if we already have this article in KV
-      let thisArticleKV = await CHIEFTAIN_KV.get(`article:${id}`, 'json')
+      let thisArticleKV = await CHIEFTAIN_KV.get(`article:${id}`, 'json') ?? null
 
       // Save R2 (raw article) if we're missing that
       if (!thisArticleR2) {
@@ -81,6 +89,13 @@ async function generateRSS ({ env }) {
     .then(async r => await r.text())
     .then(r => r.match(/\/story\/[A-Za-z0-9-_\/]*\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+\/\d+\//g)) || []
 
+  // Grab the latest stuff
+  await processLinks(todaysLinks, env)
+
+  // Grab the last 20 article metadatas we have
+  const KV: KVNamespace = env.CHIEFTAIN_KV
+  const last20 = await KV.list({ prefix: 'article:', limit: 20 }).then(async r => await Promise.all(r.keys.map(async key => await KV.get(key.name, 'json'))))
+
   const rss_obj = {
     rss: {
       '@_version': '2.0',
@@ -92,7 +107,7 @@ async function generateRSS ({ env }) {
         // lastBuildDate:
         // pubDate:
         language: 'en',
-        item: await processLinks(todaysLinks, env)
+        item: last20
       }
     }
   }
